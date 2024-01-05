@@ -22,8 +22,9 @@ delimited by hyphen (eg: A-Z a-z)
 	PosixBracRegexMap = map[string]string{
 		"[:upper:]": "A-Z",
 		"[:lower:]": "a-z",
+		"[:space:]": " ",
+		"[:alnum:]": "A-Za-z0-9",
 	}
-	DelString = ""
 )
 
 // R defines the structure to be used for storing the state of tr execution
@@ -47,10 +48,12 @@ type R struct {
 
 // Flags defines the flag object that holds all the binary options at runtime
 type Flags struct {
-	// DelString defines the string to delete
+	// DelString defines the string char to delete
 	DelString string
-	// SqueezeByte defines the []byte char to squeeze
-	SqueezeByte []byte
+	// DelBytes defines the []byte to delete
+	DelBytes []byte
+	// SqueezeBytes defines the []byte char to squeeze
+	SqueezeBytes []byte
 	// SqueezeString defines the string char to squeeze
 	SqueezeString string
 	// Action defines what mode of flag action is enabled
@@ -264,33 +267,48 @@ func (r *R) RangeMutate(ctxFunc context.CancelFunc) int {
 // Potentially be removed.
 func resolveRange(b []byte) ([]byte, error) {
 	var rangee = []byte{}
-	if len(b) != 3 && b[1] != []byte("-")[0] {
-		return []byte(""), fmt.Errorf("err: could not process byte, "+
-			"not in right format: %s\n", b)
-	}
-	asciiDiff := rune(b[2]) - rune(b[0])
-	in := rune(b[0])
-	rangee = append(rangee, []byte(string(in))...)
-	in = in + 1
-	for i := 0; i < int(asciiDiff); i++ {
+	for i := 0; i < len(b); i += 3 {
+		if len(b) != 3 && b[1] != []byte("-")[0] {
+			return []byte(""), fmt.Errorf("err: could not process byte, "+
+				"not in right format: %s\n", b)
+		}
+		asciiDiff := rune(b[2]) - rune(b[0])
+		in := rune(b[0])
 		rangee = append(rangee, []byte(string(in))...)
 		in = in + 1
+		for i := 0; i < int(asciiDiff); i++ {
+			rangee = append(rangee, []byte(string(in))...)
+			in = in + 1
+		}
 	}
 	return rangee, nil
 }
 
-// valRegexRange handles general regex syntax errors: the inclusion of
-// hyphen, a byte length of 3,
+// valRegexRange handles general regex syntax errors: parses regex expressions,
+// a byte of length n*3, where n has the length of 3,
 // and that the ascii value of the maxRange is greater than that of the minRange
-func valRegexRange(b []byte) bool {
+func valRegexRange(b []byte) []byte {
+	var bb = ""
+	for i := 0; i < len(b); i += 3 {
+		bb = bb + string(b[:i+1]) + "|"
+	}
 	if !(bytes.Contains(b, []byte("-")) && len(b) == 3 && (rune(
 		b[2]) > rune(b[0]))) {
 		log.Printf("error: incorrect regex range provided. "+
 			"Check the following:\n%s\n", VALHELP)
-		return false
+		return nil
 	}
-	return true
+
+	return []byte(bb)
 }
+
+//// resolveRanges parses multiple and single regex ranges into individual slices
+//func resolveRanges\(b []byte) (bb [][]byte) {
+//	for i := 0; i < len(b); i += 3 {
+//
+//	}
+//	return bb
+//}
 
 // ByteSliceEqual compares two byte slices, returning true if they are equal,
 // and false if they aren't.
@@ -317,7 +335,7 @@ func (r *R) ResolveRegexArg() int {
 	var errNo = 0
 	if bytes.Contains(r.From, []byte(":")) && len(bytes.Split(r.From,
 		[]byte(":"))) == 3 {
-		log.Println("reached inner about map")
+		//log.Println("reached inner about map")
 		val, ok := PosixBracRegexMap[string(r.From)]
 		if !ok {
 			errNo++
@@ -326,14 +344,14 @@ func (r *R) ResolveRegexArg() int {
 	}
 	if bytes.Contains(r.To, []byte(":")) && len(bytes.Split(r.To,
 		[]byte(":"))) == 3 {
-		log.Println("reached inner about map")
+		//log.Println("reached inner about map")
 		val, ok := PosixBracRegexMap[string(r.To)]
 		if !ok {
 			errNo++
 		}
 		r.To = []byte(val)
 	}
-	if errNo == 0 && valRegexRange(r.From) && valRegexRange(r.To) {
+	if errNo == 0 && valRegexRange(r.From) != nil && valRegexRange(r.To) != nil {
 		// passed validation. keep things the same.
 		return 0
 	} else {
@@ -358,20 +376,22 @@ func (r *R) Delete(ctx context.Context) {
 
 		r.DeleteRange(ctx)
 	} else {
-		i := 0
-		for i < len(r.RawBytes) {
-			if (len(r.Flag.DelString) < len(r.RawBytes[i:])) && (ByteSliceEqual(
-				[]byte(r.Flag.DelString), r.RawBytes[i:i+len(r.Flag.
-					DelString)])) {
-				r.RawBytes = append(r.RawBytes[:i], r.RawBytes[i+len(r.Flag.
-					DelString):]...)
-				i += len(DelString)
-			} else {
-				i++
-			}
-		}
+		r.From = []byte(r.Flag.DelString)
+		r.DeleteOne(ctx)
+		//i := 0
+		//for i < len(r.RawBytes) {
+		//	if (len(r.Flag.DelString) < len(r.RawBytes[i:])) && (ByteSliceEqual(
+		//		[]byte(r.Flag.DelString), r.RawBytes[i:i+len(r.Flag.
+		//			DelString)])) {
+		//		r.RawBytes = append(r.RawBytes[:i], r.RawBytes[i+len(r.Flag.
+		//			DelString):]...)
+		//		i += len(r.Flag.DelString)
+		//	} else {
+		//		i++
+		//	}
+		//}
 	}
-	fmt.Printf("Deleted resp: %s\n", string(r.RawBytes))
+	//fmt.Printf("Deleted resp: %s\n", string(r.RawBytes))
 	r.DestString = string(r.RawBytes)
 }
 
@@ -401,31 +421,46 @@ func (r *R) DeleteOne(ctx context.Context) {
 func (r *R) Squeeze(ctx context.Context) {
 	// Preallocate a buffer to avoid frequent reallocations
 	var buffer []byte
-	for i := 0; i < len(r.RawBytes); {
-		for j := 0; j < len(r.Flag.SqueezeByte); j++ {
-			if r.RawBytes[i] == r.Flag.SqueezeByte[j] {
-				if r.RawBytes[i] == r.Flag.SqueezeByte[j] {
-					n := endRepeated(r.RawBytes[i:])
+	n := 1
+	for i := 0; i < len(r.RawBytes); i += n {
+		fmt.Println("squeeze: outer loop")
+		fmt.Println("squeeze: processing", string(r.RawBytes[i:]))
+		for j := 0; j < len(r.Flag.SqueezeBytes); j++ {
+			fmt.Println("squeeze: inner loop")
+			if r.RawBytes[i] == r.Flag.SqueezeBytes[j] {
+				fmt.Println("found repeated")
+				fmt.Println(string(r.RawBytes[i]))
+				fmt.Printf("first %v, second %v\n", r.RawBytes[i],
+					r.RawBytes[i+1])
+				if r.RawBytes[i] == r.RawBytes[i+1] {
+					fmt.Println("enter squeeze rep loop")
+					num := endRepeated(r.RawBytes[i:])
 					buffer = append(buffer, r.RawBytes[i])
-					i += n
+					n += num - 1
+					fmt.Println("skipping ahead by: ", num)
 				}
+				break
 			} else {
 				buffer = append(buffer, r.RawBytes[i])
-				i++
+				n += 1
+				fmt.Println("incrementing instead")
 			}
 		}
+
 	}
+	r.RawBytes = buffer
+	r.DestString = string(r.RawBytes)
 }
 
 // endRepeated checks how many indices from byt's first value has repeated
 // values.
 func endRepeated(byt []byte) int {
+	fmt.Printf("end repeated: %v \n", string(byt))
 	cons := byt[0]
 	for i := 1; i < len(byt); i++ {
 		if cons == byt[i] {
 			i++
-		}
-		if cons != byt[i+1] {
+		} else {
 			return i
 		}
 	}

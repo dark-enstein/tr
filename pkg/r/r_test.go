@@ -1,6 +1,7 @@
 package r
 
 import (
+	"context"
 	"fmt"
 	"testing"
 )
@@ -27,17 +28,42 @@ func TestRead(t *testing.T) {
 		{"GqoqQqyqWq3qPqv", "GRoRQRyRWR3RPRv", 'q', 'R'},
 		{"fPlPgPLPYPTP2PxP9PXPpPOP4PiPcPaPh", "fUlUgULUYUTU2UxU9UXUpUOU4UiUcUaUh", 'P', 'U'},
 	}
+	ctx := context.Background()
 	for i := 0; i < len(test); i++ {
 		r := R{}
 		r.RawString, r.From, r.To = test[i].RawString, []byte{test[i].From},
 			[]byte{test[i].To}
-		r.Churn()
+		r.Churn(ctx)
 		if r.DestString != test[i].DestString {
 			fmt.Printf("expected %s. got %s\n", test[i].DestString,
 				r.DestString)
 		}
 	}
 }
+
+//func TestvalRegexRange(t *testing.T) {
+//	test := []struct {
+//		regex     string
+//		allValues string
+//	}{
+//		{
+//			"A-Z", "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+//		},
+//		{
+//			"A-Z0-9", "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
+//		},
+//	}
+//	ctx := context.Background()
+//	for i := 0; i < len(test); i++ {
+//		valRegexRange()
+//		[]byte{test[i].To}
+//		r.Churn(ctx)
+//		if r.DestString != test[i].DestString {
+//			fmt.Printf("expected %s. got %s\n", test[i].DestString,
+//				r.DestString)
+//		}
+//	}
+//}
 
 func BenchmarkR_Read(t *testing.B) {
 	test := []struct {
@@ -61,11 +87,12 @@ func BenchmarkR_Read(t *testing.B) {
 		{"GqoqQqyqWq3qPqv", "GRoRQRyRWR3RPRv", 'q', 'R'},
 		{"fPlPgPLPYPTP2PxP9PXPpPOP4PiPcPaPh", "fUlUgULUYUTU2UxU9UXUpUOU4UiUcUaUh", 'P', 'U'},
 	}
+	ctx := context.Background()
 	for i := 0; i < len(test); i++ {
 		r := R{}
 		r.RawString, r.From, r.To = test[i].RawString, []byte{test[i].From},
 			[]byte{test[i].To}
-		r.Churn()
+		r.Churn(ctx)
 		if r.DestString != test[i].DestString {
 			fmt.Printf("expected %s. got %s\n", test[i].DestString,
 				r.DestString)
@@ -95,11 +122,12 @@ func BenchmarkR_ReadSep(t *testing.B) {
 		{"GqoqQqyqWq3qPqv", "GRoRQRyRWR3RPRv", 'q', 'R'},
 		{"fPlPgPLPYPTP2PxP9PXPpPOP4PiPcPaPh", "fUlUgULUYUTU2UxU9UXUpUOU4UiUcUaUh", 'P', 'U'},
 	}
+	ctx := context.Background()
 	for i := 0; i < len(test); i++ {
 		r := R{}
 		r.RawString, r.From, r.To = test[i].RawString, []byte{test[i].From},
 			[]byte{test[i].To}
-		r.Churn()
+		r.Churn(ctx)
 		if r.DestString != test[i].DestString {
 			fmt.Printf("expected %s. got %s\n", test[i].DestString,
 				r.DestString)

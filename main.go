@@ -30,52 +30,81 @@ var (
 )
 
 func main() {
+	test := true
 	var ctx = context.Background()
-	_main(ctx)
-	//fmt.Println(_mainDebug(ctx))
+	f := r.Flags{}
+	switch test {
+	case true:
+		initFlags(&f)
+		if len(f.DelString) > 0 {
+			if f.Action >= 0 {
+				f.Action = r.Action_DELETE
+			} else {
+				log.Printf("Flag action already set: %d\n", f.Action)
+				return
+			}
+		}
+		if len(f.SqueezeString) > 0 {
+			fmt.Println("enter squeeze:", f.SqueezeString)
+			if f.Action >= 0 {
+				f.Action = r.Action_SQUEEZE
+				f.SqueezeBytes = []byte(f.SqueezeString)
+			} else {
+				log.Printf("Flag action already set: %d\n", f.Action)
+				return
+			}
+		}
+		_main(&f, ctx)
+	case false:
+		initFlags(&f)
+		if len(f.DelString) > 0 {
+			if f.Action >= 0 {
+				f.Action = r.Action_DELETE
+			} else {
+				log.Printf("Flag action already set: %d\n", f.Action)
+				return
+			}
+		}
+		if len(f.SqueezeString) > 0 {
+			if f.Action >= 0 {
+				f.Action = r.Action_SQUEEZE
+				f.SqueezeBytes = []byte(f.SqueezeString)
+			} else {
+				log.Printf("Flag action already set: %d\n", f.Action)
+				return
+			}
+		}
+		f.DelString = "project"
+		fmt.Println(_mainDebug(&f, ctx))
+	}
 }
 
 // initFlags initializes the flags defined at start time
 func initFlags(f *r.Flags) {
 	pflag.StringVarP(&f.DelString, "delete", "d",
-		"", "delete all occurrence of a string in input text")
-	//pflag.StringVarP(&f.SqueezeString, "squeeze", "s",
-	//	"", "reduce all repeated char occurence of any of char in value"+
-	//		" string in input text")
+		"90808", "delete all occurrence of a string in input text")
+	pflag.StringVarP(&f.SqueezeString, "squeeze", "s",
+		"", "EXPERIMENTAL: reduce all repeated char occurence of any of char"+
+			" in value"+
+			" string in input text (doesn't work as intended)")
 	pflag.Parse()
 }
 
-func _main(ctx context.Context) {
-	f := r.Flags{}
-	initFlags(&f)
+func _main(f *r.Flags, ctx context.Context) {
 	rep := r.R{}
 	var arg []string
 	by, class := whichClass()
 	if len(f.DelString) > 1 {
-		if f.Action > 0 {
-			f.Action = r.Action_DELETE
-		} else {
-			log.Printf("Flag action already set: %d\n", f.Action)
-			return
-		}
 		rep.FlagEnabled = true
-		rep.Flag = &f
+		rep.Flag = f
 	}
 	if len(f.SqueezeString) > 1 {
-		fmt.Println("enter squeeze")
-		if f.Action > 0 {
-			f.Action = r.Action_SQUEEZE
-			f.SqueezeByte = []byte(f.SqueezeString)
-		} else {
-			log.Printf("Flag action already set: %d\n", f.Action)
-			return
-		}
 		rep.FlagEnabled = true
-		rep.Flag = &f
+		rep.Flag = f
 	}
 	switch class {
 	case CONSOLE:
-		fmt.Println("enter console")
+		//fmt.Println("enter console")
 		arg = os.Args[1:]
 		b := OpenConsole()
 		rep.RawBytes = b
@@ -84,9 +113,9 @@ func _main(ctx context.Context) {
 		rep.To = []byte(arg[1])
 		rep.Churn(ctx)
 		w.Write(rep.DestString)
-		_main(ctx)
+		_main(f, ctx)
 	case STDIN:
-		fmt.Println("enter stdin")
+		//fmt.Println("enter stdin")
 		arg = os.Args[1:]
 		if len(arg) != 2 {
 			log.Printf("expecting two arguments. got: %v\n", arg)
@@ -99,7 +128,7 @@ func _main(ctx context.Context) {
 		rep.Churn(ctx)
 		w.Write(rep.DestString)
 	case FILE:
-		fmt.Println("enter file")
+		//fmt.Println("enter file")
 		fileName, err := filepath.Abs(os.Args[1])
 		if err != nil {
 			log.Printf("err with expanding file path: %s\n", err.Error())
@@ -152,12 +181,77 @@ func whichClass() ([]byte, int) {
 	return byt, STDIN
 }
 
-func _mainDebug(ctx context.Context) string {
-	r := r.R{}
-	r.RawString, r.From, r.To = DefaultRawString, []byte("a-Z"),
+func _mainDebug(f *r.Flags, ctx context.Context) string {
+	rep := r.R{}
+	rep.RawString, rep.From, rep.To = DefaultRawString, []byte("a-Z"),
 		[]byte("a-z")
-	r.Churn(ctx)
-	return r.DestString
+	rep.Churn(ctx)
+	var arg []string
+	by, class := whichClass()
+	if len(f.DelString) > 1 {
+		rep.FlagEnabled = true
+		rep.Flag = f
+	}
+	if len(f.SqueezeString) > 1 {
+		rep.FlagEnabled = true
+		rep.Flag = f
+	}
+	switch class {
+	case CONSOLE:
+		//fmt.Println("enter console")
+		arg = os.Args[1:]
+		b := OpenConsole()
+		rep.RawBytes = b
+		rep.RawString = string(b)
+		rep.From = []byte(arg[0])
+		rep.To = []byte(arg[1])
+		rep.Churn(ctx)
+		w.Write(rep.DestString)
+		_main(f, ctx)
+	case STDIN:
+		//fmt.Println("enter stdin")
+		arg = os.Args[1:]
+		if len(arg) != 2 {
+			log.Printf("expecting two arguments. got: %v\n", arg)
+			os.Exit(1)
+		}
+		rep.RawBytes = by
+		rep.RawString = string(by)
+		rep.From = []byte(arg[0])
+		rep.To = []byte(arg[1])
+		rep.Churn(ctx)
+		w.Write(rep.DestString)
+	case FILE:
+		//fmt.Println("enter file")
+		fileName, err := filepath.Abs(os.Args[1])
+		if err != nil {
+			log.Printf("err with expanding file path: %s\n", err.Error())
+			os.Exit(1)
+		}
+		_, err = os.Stat(fileName)
+		if os.IsNotExist(err) {
+			log.Printf("err file doesn't exist: %s\n",
+				err.Error())
+			os.Exit(1)
+		}
+		fileB, err := os.ReadFile(fileName)
+		if err != nil {
+			log.Printf("err with reading file: %s\n", err.Error())
+			os.Exit(1)
+		}
+		rep.RawBytes = fileB
+		rep.RawString = string(fileB)
+		arg = os.Args[2:]
+		if len(arg) != 2 {
+			log.Printf("expecting two arguments. got: %v\n", arg)
+			os.Exit(1)
+		}
+		rep.From = []byte(arg[0])
+		rep.To = []byte(arg[1])
+		rep.Churn(ctx)
+		w.Write(rep.DestString)
+	}
+	return rep.DestString
 }
 
 func OpenConsole() []byte {
